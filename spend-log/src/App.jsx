@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-const CATEGORIES = ["Misc", "Food", "Entertainment"];
+const CATEGORIES = ["", "Food", "Misc", "Entertainment"];
 
 function getWeekStart(date) {
   const d = new Date(date);
@@ -222,7 +222,7 @@ export default function App() {
   const [modal, setModal] = useState(null);
   const [input, setInput] = useState("");
   const [desc, setDesc] = useState("");
-  const [category, setCategory] = useState("Misc");
+  const [category, setCategory] = useState("Food");
   const [isCredit, setIsCredit] = useState(false);
   const [animDay, setAnimDay] = useState(null);
   const [editingId, setEditingId] = useState(null);
@@ -235,12 +235,12 @@ export default function App() {
 
   function openModal(date) {
     setModal({ date, key: formatKey(date) });
-    setInput(""); setDesc(""); setCategory("Misc"); setIsCredit(false); setEditingId(null);
+    setInput(""); setDesc(""); setCategory("Food"); setIsCredit(false); setEditingId(null);
   }
 
   function closeModal() {
     setModal(null);
-    setInput(""); setDesc(""); setCategory("Misc"); setIsCredit(false); setEditingId(null);
+    setInput(""); setDesc(""); setCategory("Food"); setIsCredit(false); setEditingId(null);
   }
 
   function addEntry() {
@@ -251,7 +251,7 @@ export default function App() {
     setLedger(prev => ({ ...prev, [modal.key]: [...(prev[modal.key] || []), entry] }));
     setAnimDay(modal.key);
     setTimeout(() => setAnimDay(null), 600);
-    setInput(""); setDesc(""); setCategory("Misc"); setIsCredit(false);
+    setInput(""); setDesc(""); setCategory("Food"); setIsCredit(false);
     setTimeout(() => amountRef.current?.focus(), 50);
   }
 
@@ -259,7 +259,7 @@ export default function App() {
     setEditingId(entry.id);
     setInput(Math.abs(entry.amount).toString());
     setDesc(entry.desc);
-    setCategory(entry.category || "Misc");
+    setCategory(entry.category || "Food");
     setIsCredit(entry.amount < 0);
   }
 
@@ -277,7 +277,7 @@ export default function App() {
   }
 
   function cancelEdit() {
-    setEditingId(null); setInput(""); setDesc(""); setCategory("Misc"); setIsCredit(false);
+    setEditingId(null); setInput(""); setDesc(""); setCategory("Food"); setIsCredit(false);
   }
 
   function deleteEntry(id) {
@@ -502,7 +502,7 @@ export default function App() {
                           value={category}
                           onChange={e => setCategory(e.target.value)}
                         >
-                          {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                          {CATEGORIES.map(c => <option key={c} value={c}>{c === "" ? "— Select category —" : c}</option>)}
                         </select>
                         <label className="credit-toggle">
                           <input type="checkbox" checked={isCredit} onChange={e => setIsCredit(e.target.checked)} />
@@ -521,7 +521,7 @@ export default function App() {
                               {entry.amount < 0 ? "-" : ""}${Math.abs(entry.amount).toFixed(2)}
                             </span>
                             <span style={styles.categoryBadge(entry.category)}>
-                              {entry.category || "Misc"}
+                              {entry.category || "Food"}
                             </span>
                             {entry.amount < 0 && <span style={{ fontSize: 9, color: "#5a9a5a" }}>credit</span>}
                           </div>
@@ -568,7 +568,7 @@ export default function App() {
                   value={category}
                   onChange={e => setCategory(e.target.value)}
                 >
-                  {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  {CATEGORIES.map(c => <option key={c} value={c}>{c === "" ? "— Select category —" : c}</option>)}
                 </select>
                 <label className="credit-toggle">
                   <input type="checkbox" checked={isCredit} onChange={e => setIsCredit(e.target.checked)} />
