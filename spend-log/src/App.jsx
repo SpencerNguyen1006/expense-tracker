@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from "react";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+const CATEGORIES = ["Misc", "Food", "Entertainment"];
+
 function getWeekStart(date) {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
@@ -23,36 +25,45 @@ function formatMonth(date) {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function dayTotal(transactions) {
-  return transactions.reduce((s, t) => s + t.amount, 0);
+function dayTotal(entries) {
+  return entries.reduce((s, e) => s + e.amount, 0);
 }
 
-function getMtdTotal(spendings, upToDate) {
+function getMtdTotal(ledger, upToDate) {
   const year = upToDate.getFullYear();
   const month = upToDate.getMonth();
   let total = 0;
-  Object.entries(spendings).forEach(([key, txns]) => {
+  Object.entries(ledger).forEach(([key, entries]) => {
     const d = new Date(key + "T00:00:00");
     if (d.getFullYear() === year && d.getMonth() === month && d <= upToDate) {
-      total += dayTotal(txns);
+      total += dayTotal(entries);
     }
   });
   return total;
 }
 
-// Get all weeks that overlap with the current month
+function getMtdByCategory(ledger, upToDate, category) {
+  const year = upToDate.getFullYear();
+  const month = upToDate.getMonth();
+  let total = 0;
+  Object.entries(ledger).forEach(([key, entries]) => {
+    const d = new Date(key + "T00:00:00");
+    if (d.getFullYear() === year && d.getMonth() === month && d <= upToDate) {
+      entries.forEach(e => {
+        if (e.category === category) total += e.amount;
+      });
+    }
+  });
+  return total;
+}
+
 function getMonthWeeks(today) {
   const year = today.getFullYear();
   const month = today.getMonth();
-
-  // First and last day of the month
   const firstDay = new Date(year, month, 1);
   const lastDay = new Date(year, month + 1, 0);
-
-  // Start from the Sunday of the first week
   const start = getWeekStart(firstDay);
   const weeks = [];
-
   let current = new Date(start);
   while (current <= lastDay) {
     weeks.push(new Date(current));
@@ -61,38 +72,40 @@ function getMonthWeeks(today) {
   return weeks;
 }
 
-function buildSpendingContext(spendings, today) {
+function buildSpendingContext(ledger, today) {
   const lines = [];
   lines.push(`Today is ${today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}.`);
-  const mtd = getMtdTotal(spendings, today);
+  const mtd = getMtdTotal(ledger, today);
+  const foodMtd = getMtdByCategory(ledger, today, "Food");
   lines.push(`Month-to-date total spending: $${mtd.toFixed(2)}.`);
-  const allEntries = Object.entries(spendings).sort(([a], [b]) => a.localeCompare(b));
+  lines.push(`Month-to-date Food spending: $${foodMtd.toFixed(2)}.`);
+  const allEntries = Object.entries(ledger).sort(([a], [b]) => a.localeCompare(b));
   if (allEntries.length === 0) {
-    lines.push("No transactions recorded yet.");
+    lines.push("No entries recorded yet.");
   } else {
-    lines.push("\nAll recorded transactions:");
-    allEntries.forEach(([key, txns]) => {
+    lines.push("\nAll recorded entries:");
+    allEntries.forEach(([key, entries]) => {
       const d = new Date(key + "T00:00:00");
       const label = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-      const daySum = dayTotal(txns);
+      const daySum = dayTotal(entries);
       lines.push(`\n${label} (total: $${daySum.toFixed(2)}):`);
-      txns.forEach(t => {
-        const sign = t.amount < 0 ? "" : "";
-        lines.push(`  - $${t.amount.toFixed(2)}${t.desc ? ` (${t.desc})` : ""}${t.amount < 0 ? " [credit]" : ""}`);
+      entries.forEach(e => {
+        lines.push(`  - $${e.amount.toFixed(2)} [${e.category}]${e.desc ? ` (${e.desc})` : ""}${e.amount < 0 ? " [credit]" : ""}`);
       });
     });
   }
   return lines.join("\n");
 }
 
-async function askClaude(question, spendings, today) {
-  const context = buildSpendingContext(spendings, today);
+async function askClaude(question, ledger, today) {
+  const context = buildSpendingContext(ledger, today);
   const systemPrompt = `You are a spending assistant built into a personal spending tracker app called Spend Log.
 You have access to the user's spending data below. Answer questions about their spending concisely and helpfully.
 Only answer questions about their spending data. If asked anything unrelated, politely redirect them.
 Keep answers short — 1 to 3 sentences max unless a breakdown is needed.
 Always use dollar signs and format numbers to 2 decimal places.
 Negative amounts represent credits or refunds.
+Entries have categories: Misc, Food, Entertainment.
 
 SPENDING DATA:
 ${context}`;
@@ -113,7 +126,7 @@ ${context}`;
 
 // ─── Chatbot ──────────────────────────────────────────────────────────────────
 
-function Chatbot({ spendings, today }) {
+function Chatbot({ ledger, today }) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([
     { role: "assistant", text: "Hi! Ask me anything about your spending 💸" }
@@ -133,7 +146,7 @@ function Chatbot({ spendings, today }) {
     setMessages(prev => [...prev, { role: "user", text: q }]);
     setLoading(true);
     try {
-      const answer = await askClaude(q, spendings, today);
+      const answer = await askClaude(q, ledger, today);
       setMessages(prev => [...prev, { role: "assistant", text: answer }]);
     } catch {
       setMessages(prev => [...prev, { role: "assistant", text: "Something went wrong. Please try again." }]);
@@ -183,7 +196,7 @@ function Chatbot({ spendings, today }) {
             <button style={cs.sendBtn} onClick={send} disabled={loading}>↑</button>
           </div>
           <div style={cs.quickRow}>
-            {["This week total?", "MTD total?", "Biggest expense?"].map(q => (
+            {["This week total?", "MTD total?", "Food this month?"].map(q => (
               <button key={q} style={cs.quickBtn} onClick={() => setInput(q)}>{q}</button>
             ))}
           </div>
@@ -201,73 +214,75 @@ export default function App() {
 
   const weeks = getMonthWeeks(today);
 
-  const [spendings, setSpendings] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("spendings_v2") || "{}"); }
+  const [ledger, setLedger] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("spendlog_ledger") || "{}"); }
     catch { return {}; }
   });
 
   const [modal, setModal] = useState(null);
   const [input, setInput] = useState("");
   const [desc, setDesc] = useState("");
+  const [category, setCategory] = useState("Misc");
   const [isCredit, setIsCredit] = useState(false);
   const [animDay, setAnimDay] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const amountRef = useRef(null);
 
   useEffect(() => {
-    try { localStorage.setItem("spendings_v2", JSON.stringify(spendings)); }
+    try { localStorage.setItem("spendlog_ledger", JSON.stringify(ledger)); }
     catch {}
-  }, [spendings]);
+  }, [ledger]);
 
   function openModal(date) {
     setModal({ date, key: formatKey(date) });
-    setInput(""); setDesc(""); setIsCredit(false); setEditingId(null);
+    setInput(""); setDesc(""); setCategory("Misc"); setIsCredit(false); setEditingId(null);
   }
 
   function closeModal() {
     setModal(null);
-    setInput(""); setDesc(""); setIsCredit(false); setEditingId(null);
+    setInput(""); setDesc(""); setCategory("Misc"); setIsCredit(false); setEditingId(null);
   }
 
-  function addTransaction() {
+  function addEntry() {
     const val = parseFloat(input);
     if (isNaN(val) || val <= 0) return;
     const amount = isCredit ? -val : val;
-    const txn = { id: Date.now(), amount, desc: desc.trim() };
-    setSpendings(prev => ({ ...prev, [modal.key]: [...(prev[modal.key] || []), txn] }));
+    const entry = { id: Date.now(), amount, desc: desc.trim(), category };
+    setLedger(prev => ({ ...prev, [modal.key]: [...(prev[modal.key] || []), entry] }));
     setAnimDay(modal.key);
     setTimeout(() => setAnimDay(null), 600);
-    setInput(""); setDesc(""); setIsCredit(false);
+    setInput(""); setDesc(""); setCategory("Misc"); setIsCredit(false);
     setTimeout(() => amountRef.current?.focus(), 50);
   }
 
-  function startEdit(txn) {
-    setEditingId(txn.id);
-    setInput(Math.abs(txn.amount).toString());
-    setDesc(txn.desc);
-    setIsCredit(txn.amount < 0);
+  function startEdit(entry) {
+    setEditingId(entry.id);
+    setInput(Math.abs(entry.amount).toString());
+    setDesc(entry.desc);
+    setCategory(entry.category || "Misc");
+    setIsCredit(entry.amount < 0);
   }
 
   function saveEdit() {
     const val = parseFloat(input);
     if (isNaN(val) || val <= 0) { cancelEdit(); return; }
     const amount = isCredit ? -val : val;
-    setSpendings(prev => ({
+    setLedger(prev => ({
       ...prev,
-      [modal.key]: (prev[modal.key] || []).map(t =>
-        t.id === editingId ? { ...t, amount, desc: desc.trim() } : t
+      [modal.key]: (prev[modal.key] || []).map(e =>
+        e.id === editingId ? { ...e, amount, desc: desc.trim(), category } : e
       ),
     }));
     cancelEdit();
   }
 
   function cancelEdit() {
-    setEditingId(null); setInput(""); setDesc(""); setIsCredit(false);
+    setEditingId(null); setInput(""); setDesc(""); setCategory("Misc"); setIsCredit(false);
   }
 
-  function deleteTransaction(id) {
-    setSpendings(prev => {
-      const next = (prev[modal.key] || []).filter(t => t.id !== id);
+  function deleteEntry(id) {
+    setLedger(prev => {
+      const next = (prev[modal.key] || []).filter(e => e.id !== id);
       const updated = { ...prev };
       if (next.length === 0) delete updated[modal.key];
       else updated[modal.key] = next;
@@ -279,12 +294,11 @@ export default function App() {
   function weekTotal(weekStart) {
     let total = 0;
     for (let i = 0; i < 7; i++) {
-      total += dayTotal(spendings[formatKey(addDays(weekStart, i))] || []);
+      total += dayTotal(ledger[formatKey(addDays(weekStart, i))] || []);
     }
     return total;
   }
 
-  // Check if a week has any days in the current month
   function weekLabel(weekStart) {
     const month = today.getMonth();
     const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -293,6 +307,11 @@ export default function App() {
     const last = monthDays[monthDays.length - 1];
     return `${formatMonth(first)} – ${formatMonth(last)}`;
   }
+
+  const mtdTotal = getMtdTotal(ledger, today);
+  const foodMtd = getMtdByCategory(ledger, today, "Food");
+  const modalEntries = modal ? (ledger[modal.key] || []) : [];
+  const modalTotal = dayTotal(modalEntries);
 
   function renderWeek(weekStart, weekIndex) {
     const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -304,10 +323,7 @@ export default function App() {
         <div style={styles.weekHeader}>
           <span style={styles.weekLabel}>Week {weekIndex + 1}</span>
           <span style={styles.weekRange}>{weekLabel(weekStart)}</span>
-          <span style={{
-            ...styles.weekTotal,
-            color: total < 0 ? "#7ec97e" : "#e8c97e"
-          }}>
+          <span style={{ ...styles.weekTotal, color: total < 0 ? "#7ec97e" : "#e8c97e" }}>
             {total !== 0 ? `${total < 0 ? "-" : ""}$${Math.abs(total).toFixed(2)}` : "—"}
           </span>
         </div>
@@ -315,13 +331,13 @@ export default function App() {
         <div style={styles.dayGrid}>
           {days.map((date) => {
             const key = formatKey(date);
-            const txns = spendings[key] || [];
+            const entries = ledger[key] || [];
             const isToday = formatKey(date) === formatKey(today);
             const isFuture = date > today;
             const isOtherMonth = date.getMonth() !== month;
             const isAnim = animDay === key;
-            const total = dayTotal(txns);
-            const mtd = isFuture ? null : getMtdTotal(spendings, date);
+            const total = dayTotal(entries);
+            const mtd = isFuture ? null : getMtdTotal(ledger, date);
             const isCredit = total < 0;
 
             return (
@@ -332,7 +348,7 @@ export default function App() {
                   ...styles.dayCard,
                   ...(isToday ? styles.todayCard : {}),
                   ...(isFuture || isOtherMonth ? styles.futureCard : {}),
-                  ...(txns.length > 0 && !isOtherMonth ? (isCredit ? styles.creditEntry : styles.hasEntry) : {}),
+                  ...(entries.length > 0 && !isOtherMonth ? (isCredit ? styles.creditEntry : styles.hasEntry) : {}),
                   ...(isAnim ? styles.animCard : {}),
                   cursor: isFuture || isOtherMonth ? "default" : "pointer",
                 }}
@@ -346,13 +362,13 @@ export default function App() {
 
                 <div style={styles.cardBottom}>
                   <div style={styles.entryBlock}>
-                    {txns.length > 0 && !isOtherMonth ? (
+                    {entries.length > 0 && !isOtherMonth ? (
                       <>
                         <span style={{ ...styles.amount, color: isCredit ? "#7ec97e" : "#e8e4dc" }}>
                           {isCredit ? "-" : ""}${Math.abs(total).toFixed(2)}
                         </span>
-                        <span style={styles.txnCount}>
-                          {txns.length} {txns.length === 1 ? "txn" : "txns"}
+                        <span style={styles.entryCount}>
+                          {entries.length} {entries.length === 1 ? "entry" : "entries"}
                         </span>
                       </>
                     ) : (
@@ -377,9 +393,6 @@ export default function App() {
     );
   }
 
-  const modalTxns = modal ? (spendings[modal.key] || []) : [];
-  const modalTotal = dayTotal(modalTxns);
-
   return (
     <div style={styles.root}>
       <style>{`
@@ -388,13 +401,14 @@ export default function App() {
         body { background: #0f0e0c; }
         input::placeholder { color: #5a5650; }
         input:focus { outline: none; border-color: #e8c97e !important; }
+        select:focus { outline: none; border-color: #e8c97e !important; }
         .modal-overlay { animation: fadeIn 0.15s ease; }
         @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
         .modal-box { animation: slideUp 0.2s ease; }
         @keyframes slideUp { from { transform: translateY(20px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
         @keyframes pulse { 0%,100% { transform: scale(1) } 50% { transform: scale(1.03) } }
-        .txn-row:hover .txn-actions { opacity: 1 !important; }
-        .txn-row:hover { border-color: #3a3830 !important; }
+        .entry-row:hover .entry-actions { opacity: 1 !important; }
+        .entry-row:hover { border-color: #3a3830 !important; }
         .credit-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; }
         .credit-toggle input { accent-color: #7ec97e; width: 16px; height: 16px; cursor: pointer; }
       `}</style>
@@ -407,10 +421,17 @@ export default function App() {
             {today.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
           </p>
           <p style={styles.mtdHeader}>
-            MTD: <span style={{
-              color: getMtdTotal(spendings, today) < 0 ? "#7ec97e" : "#e8c97e"
-            }}>${getMtdTotal(spendings, today).toFixed(2)}</span>
+            MTD: <span style={{ color: mtdTotal < 0 ? "#7ec97e" : "#e8c97e" }}>
+              {mtdTotal < 0 ? "-" : ""}${Math.abs(mtdTotal).toFixed(2)}
+            </span>
           </p>
+          {foodMtd !== 0 && (
+            <p style={styles.categoryHeader}>
+              🍔 Food: <span style={{ color: foodMtd < 0 ? "#7ec97e" : "#e8c97e" }}>
+                {foodMtd < 0 ? "-" : ""}${Math.abs(foodMtd).toFixed(2)}
+              </span>
+            </p>
+          )}
         </div>
       </div>
 
@@ -420,7 +441,7 @@ export default function App() {
       </div>
 
       {/* Chatbot */}
-      <Chatbot spendings={spendings} today={today} />
+      <Chatbot ledger={ledger} today={today} />
 
       {/* Modal */}
       {modal && (
@@ -439,24 +460,24 @@ export default function App() {
                   {modal.date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                 </div>
               </div>
-              {modalTxns.length > 0 && (
+              {modalEntries.length > 0 && (
                 <div style={styles.modalSummary}>
                   <div style={{ ...styles.modalTotalAmt, color: modalTotal < 0 ? "#7ec97e" : "#e8e4dc" }}>
                     {modalTotal < 0 ? "-" : ""}${Math.abs(modalTotal).toFixed(2)}
                   </div>
                   <div style={styles.modalTotalCount}>
-                    {modalTxns.length} {modalTxns.length === 1 ? "transaction" : "transactions"}
+                    {modalEntries.length} {modalEntries.length === 1 ? "entry" : "entries"}
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Transaction list */}
-            {modalTxns.length > 0 && (
-              <div style={styles.txnList}>
-                {modalTxns.map((txn) => (
-                  <div key={txn.id} className="txn-row" style={styles.txnRow}>
-                    {editingId === txn.id ? (
+            {/* Entry list */}
+            {modalEntries.length > 0 && (
+              <div style={styles.entryList}>
+                {modalEntries.map((entry) => (
+                  <div key={entry.id} className="entry-row" style={styles.entryRow}>
+                    {editingId === entry.id ? (
                       <div style={styles.inlineEdit}>
                         <input
                           style={{ ...styles.input, fontSize: 13, padding: "8px 10px" }}
@@ -476,15 +497,16 @@ export default function App() {
                           onChange={e => setDesc(e.target.value)}
                           onKeyDown={e => { if (e.key === "Enter") saveEdit(); if (e.key === "Escape") cancelEdit(); }}
                         />
+                        <select
+                          style={styles.select}
+                          value={category}
+                          onChange={e => setCategory(e.target.value)}
+                        >
+                          {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
                         <label className="credit-toggle">
-                          <input
-                            type="checkbox"
-                            checked={isCredit}
-                            onChange={e => setIsCredit(e.target.checked)}
-                          />
-                          <span style={{ fontSize: 11, color: isCredit ? "#7ec97e" : "#6b6660" }}>
-                            Credit / Refund
-                          </span>
+                          <input type="checkbox" checked={isCredit} onChange={e => setIsCredit(e.target.checked)} />
+                          <span style={{ fontSize: 11, color: isCredit ? "#7ec97e" : "#6b6660" }}>Credit / Refund</span>
                         </label>
                         <div style={{ display: "flex", gap: 6 }}>
                           <button style={{ ...styles.saveBtn, padding: "7px 12px", fontSize: 11 }} onClick={saveEdit}>Save</button>
@@ -493,16 +515,21 @@ export default function App() {
                       </div>
                     ) : (
                       <>
-                        <div style={styles.txnInfo}>
-                          <span style={{ ...styles.txnAmount, color: txn.amount < 0 ? "#7ec97e" : "#e8e4dc" }}>
-                            {txn.amount < 0 ? "-" : ""}${Math.abs(txn.amount).toFixed(2)}
-                            {txn.amount < 0 && <span style={{ fontSize: 9, marginLeft: 4, color: "#5a9a5a" }}>credit</span>}
-                          </span>
-                          {txn.desc && <span style={styles.txnDesc}>{txn.desc}</span>}
+                        <div style={styles.entryInfo}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <span style={{ ...styles.entryAmount, color: entry.amount < 0 ? "#7ec97e" : "#e8e4dc" }}>
+                              {entry.amount < 0 ? "-" : ""}${Math.abs(entry.amount).toFixed(2)}
+                            </span>
+                            <span style={styles.categoryBadge(entry.category)}>
+                              {entry.category || "Misc"}
+                            </span>
+                            {entry.amount < 0 && <span style={{ fontSize: 9, color: "#5a9a5a" }}>credit</span>}
+                          </div>
+                          {entry.desc && <span style={styles.entryDesc}>{entry.desc}</span>}
                         </div>
-                        <div className="txn-actions" style={{ ...styles.txnActions, opacity: 0 }}>
-                          <button style={styles.iconBtn} onClick={() => startEdit(txn)}>✎</button>
-                          <button style={{ ...styles.iconBtn, color: "#c0614a" }} onClick={() => deleteTransaction(txn.id)}>✕</button>
+                        <div className="entry-actions" style={{ ...styles.entryActions, opacity: 0 }}>
+                          <button style={styles.iconBtn} onClick={() => startEdit(entry)}>✎</button>
+                          <button style={{ ...styles.iconBtn, color: "#c0614a" }} onClick={() => deleteEntry(entry.id)}>✕</button>
                         </div>
                       </>
                     )}
@@ -511,11 +538,11 @@ export default function App() {
               </div>
             )}
 
-            {/* Add transaction */}
+            {/* Add entry */}
             {editingId === null && (
               <div style={styles.addSection}>
                 <div style={styles.addSectionLabel}>
-                  {modalTxns.length === 0 ? "Add a transaction" : "Add another"}
+                  {modalEntries.length === 0 ? "Add an entry" : "Add another"}
                 </div>
                 <input
                   ref={amountRef}
@@ -525,8 +552,8 @@ export default function App() {
                   placeholder="Amount ($)"
                   value={input}
                   onChange={e => setInput(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && addTransaction()}
-                  autoFocus={modalTxns.length === 0}
+                  onKeyDown={e => e.key === "Enter" && addEntry()}
+                  autoFocus={modalEntries.length === 0}
                 />
                 <input
                   style={styles.input}
@@ -534,25 +561,23 @@ export default function App() {
                   placeholder="Note (optional)"
                   value={desc}
                   onChange={e => setDesc(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && addTransaction()}
+                  onKeyDown={e => e.key === "Enter" && addEntry()}
                 />
+                <select
+                  style={styles.select}
+                  value={category}
+                  onChange={e => setCategory(e.target.value)}
+                >
+                  {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
                 <label className="credit-toggle">
-                  <input
-                    type="checkbox"
-                    checked={isCredit}
-                    onChange={e => setIsCredit(e.target.checked)}
-                  />
-                  <span style={{ fontSize: 11, color: isCredit ? "#7ec97e" : "#6b6660" }}>
-                    Credit / Refund
-                  </span>
+                  <input type="checkbox" checked={isCredit} onChange={e => setIsCredit(e.target.checked)} />
+                  <span style={{ fontSize: 11, color: isCredit ? "#7ec97e" : "#6b6660" }}>Credit / Refund</span>
                 </label>
                 <div style={styles.modalActions}>
                   <button style={styles.cancelBtn} onClick={closeModal}>Done</button>
-                  <button style={{
-                    ...styles.saveBtn,
-                    background: isCredit ? "#7ec97e" : "#e8c97e",
-                  }} onClick={addTransaction}>
-                    {isCredit ? "Add Credit" : "Add"}
+                  <button style={{ ...styles.saveBtn, background: isCredit ? "#7ec97e" : "#e8c97e" }} onClick={addEntry}>
+                    {isCredit ? "Add Credit" : "Add Entry"}
                   </button>
                 </div>
               </div>
@@ -563,6 +588,14 @@ export default function App() {
     </div>
   );
 }
+
+// ─── Category badge color ─────────────────────────────────────────────────────
+
+const categoryColors = {
+  Food: { bg: "#1a2a1a", color: "#7ec97e", border: "#2a4a2a" },
+  Entertainment: { bg: "#1a1a2a", color: "#7e9ec9", border: "#2a2a4a" },
+  Misc: { bg: "#2a2824", color: "#8b8680", border: "#3a3830" },
+};
 
 // ─── Chatbot Styles ───────────────────────────────────────────────────────────
 
@@ -621,6 +654,7 @@ const styles = {
   },
   subtitle: { fontSize: 11, color: "#6b6660", letterSpacing: "0.12em", textTransform: "uppercase" },
   mtdHeader: { fontSize: 11, color: "#6b6660", marginTop: 4, letterSpacing: "0.06em" },
+  categoryHeader: { fontSize: 11, color: "#6b6660", marginTop: 2, letterSpacing: "0.06em" },
   weeksContainer: { padding: "0 8px" },
   weekSection: { marginTop: 20 },
   weekHeader: {
@@ -647,8 +681,8 @@ const styles = {
   dayNum: { fontSize: 12, color: "#8b8680" },
   cardBottom: { display: "flex", flexDirection: "column", alignItems: "center", flex: 1, justifyContent: "flex-end" },
   entryBlock: { display: "flex", flexDirection: "column", alignItems: "center", gap: 1 },
-  amount: { fontSize: 10, color: "#e8e4dc", lineHeight: 1.2, textAlign: "center" },
-  txnCount: { fontSize: 8, color: "#6b6660" },
+  amount: { fontSize: 10, lineHeight: 1.2, textAlign: "center" },
+  entryCount: { fontSize: 8, color: "#6b6660" },
   addHint: { fontSize: 9, color: "#3a3830" },
   mtdBlock: { display: "flex", flexDirection: "column", alignItems: "center", gap: 1, marginTop: 2 },
   mtdValue: { fontSize: 8, lineHeight: 1.2 },
@@ -668,20 +702,20 @@ const styles = {
   modalSummary: { textAlign: "right" },
   modalTotalAmt: { fontFamily: "'DM Serif Display', serif", fontSize: 22 },
   modalTotalCount: { fontSize: 10, color: "#6b6660", letterSpacing: "0.06em", marginTop: 2 },
-  txnList: {
+  entryList: {
     display: "flex", flexDirection: "column", gap: 4,
     borderTop: "1px solid #2a2824", borderBottom: "1px solid #2a2824",
     paddingTop: 12, paddingBottom: 12,
   },
-  txnRow: {
+  entryRow: {
     display: "flex", alignItems: "center", justifyContent: "space-between",
     padding: "8px 10px", borderRadius: 6, background: "#111009",
     border: "1px solid #222120", transition: "border-color 0.1s", gap: 8,
   },
-  txnInfo: { display: "flex", flexDirection: "column", gap: 2, flex: 1, minWidth: 0 },
-  txnAmount: { fontFamily: "'DM Serif Display', serif", fontSize: 15 },
-  txnDesc: { fontSize: 10, color: "#6b6660", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", letterSpacing: "0.04em" },
-  txnActions: { display: "flex", gap: 4, transition: "opacity 0.15s", flexShrink: 0 },
+  entryInfo: { display: "flex", flexDirection: "column", gap: 3, flex: 1, minWidth: 0 },
+  entryAmount: { fontFamily: "'DM Serif Display', serif", fontSize: 15 },
+  entryDesc: { fontSize: 10, color: "#6b6660", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", letterSpacing: "0.04em" },
+  entryActions: { display: "flex", gap: 4, transition: "opacity 0.15s", flexShrink: 0 },
   iconBtn: { background: "transparent", border: "none", color: "#6b6660", cursor: "pointer", fontSize: 14, padding: "2px 5px", borderRadius: 4, fontFamily: "inherit" },
   inlineEdit: { display: "flex", flexDirection: "column", gap: 8, width: "100%" },
   addSection: { display: "flex", flexDirection: "column", gap: 10 },
@@ -690,6 +724,16 @@ const styles = {
     background: "#111009", border: "1px solid #2a2824", borderRadius: 8,
     padding: "12px 14px", color: "#e8e4dc", fontFamily: "'DM Mono', monospace",
     fontSize: 15, width: "100%", transition: "border-color 0.15s",
+  },
+  select: {
+    background: "#111009", border: "1px solid #2a2824", borderRadius: 8,
+    padding: "12px 14px", color: "#e8e4dc", fontFamily: "'DM Mono', monospace",
+    fontSize: 13, width: "100%", cursor: "pointer", transition: "border-color 0.15s",
+    appearance: "none",
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b6660' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
+    backgroundRepeat: "no-repeat",
+    backgroundPosition: "right 14px center",
+    paddingRight: 36,
   },
   modalActions: { display: "flex", gap: 8 },
   saveBtn: {
@@ -702,4 +746,11 @@ const styles = {
     borderRadius: 8, padding: "12px", fontFamily: "'DM Mono', monospace",
     fontSize: 13, cursor: "pointer", letterSpacing: "0.06em",
   },
+  categoryBadge: (cat) => ({
+    fontSize: 9, padding: "2px 6px", borderRadius: 4,
+    background: categoryColors[cat]?.bg || categoryColors.Misc.bg,
+    color: categoryColors[cat]?.color || categoryColors.Misc.color,
+    border: `1px solid ${categoryColors[cat]?.border || categoryColors.Misc.border}`,
+    letterSpacing: "0.06em", textTransform: "uppercase",
+  }),
 };
