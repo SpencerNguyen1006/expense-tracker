@@ -417,7 +417,7 @@ export default function App() {
   return (
     <div style={styles.root}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,600&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
         body {
@@ -708,8 +708,8 @@ const styles = {
     display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 12,
   },
   title: {
-    fontFamily: "'DM Serif Display', serif", fontSize: 34,
-    lineHeight: 1.1, color: "#e8c97e", letterSpacing: "-0.5px",
+    fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 32,
+    lineHeight: 1.1, color: "#e8c97e", letterSpacing: "-0.3px",
   },
   subtitle: { fontSize: 11, color: "#6b6660", letterSpacing: "0.12em", textTransform: "uppercase", marginTop: 6 },
   statCard: {
