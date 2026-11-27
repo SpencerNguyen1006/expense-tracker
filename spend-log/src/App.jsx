@@ -168,6 +168,7 @@ function Chatbot({ ledger, today }) {
   return (
     <>
       <button
+        className="fab-btn"
         onClick={() => setOpen(o => !o)}
         style={{ ...cs.fab, background: open ? "#2a2824" : "#e8c97e", color: open ? "#e8c97e" : "#0f0e0c" }}
       >
@@ -338,9 +339,13 @@ export default function App() {
         <div style={styles.weekHeader}>
           <span style={styles.weekLabel}>Week {weekIndex + 1}</span>
           <span style={styles.weekRange}>{weekLabel(weekStart)}</span>
-          <span style={{ ...styles.weekTotal, color: total < 0 ? "#7ec97e" : "#e8c97e" }}>
-            {total !== 0 ? `${total < 0 ? "-" : ""}$${Math.abs(total).toFixed(2)}` : "—"}
-          </span>
+          {total !== 0 ? (
+            <span style={{ ...styles.weekTotal, color: total < 0 ? "#7ec97e" : "#e8c97e" }}>
+              {total < 0 ? "-" : ""}${Math.abs(total).toFixed(2)}
+            </span>
+          ) : (
+            <span style={styles.weekTotalEmpty}>No spending yet</span>
+          )}
         </div>
 
         <div style={styles.dayGrid}>
@@ -358,6 +363,7 @@ export default function App() {
             return (
               <div
                 key={key}
+                className="day-card"
                 onClick={() => !isOtherMonth && openModal(date)}
                 style={{
                   ...styles.dayCard,
@@ -413,52 +419,78 @@ export default function App() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #0f0e0c; }
+        html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+        body {
+          background:
+            radial-gradient(ellipse 900px 500px at 50% -5%, #1d1a12 0%, transparent 60%),
+            #0b0a08;
+        }
         input::placeholder { color: #5a5650; }
         input:focus { outline: none; border-color: #e8c97e !important; }
         select:focus { outline: none; border-color: #e8c97e !important; }
         .modal-overlay { animation: fadeIn 0.15s ease; }
         @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
-        .modal-box { animation: slideUp 0.2s ease; }
-        @keyframes slideUp { from { transform: translateY(20px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
+        .modal-box { animation: slideUp 0.25s cubic-bezier(.2,.8,.2,1); }
+        @keyframes slideUp { from { transform: translateY(24px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
         @keyframes pulse { 0%,100% { transform: scale(1) } 50% { transform: scale(1.03) } }
         .entry-row:hover .entry-actions { opacity: 1 !important; }
-        .entry-row:hover { border-color: #3a3830 !important; }
+        .entry-row:hover { border-color: #3a3830 !important; background: #141210 !important; }
         .credit-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; }
         .credit-toggle input { accent-color: #7ec97e; width: 16px; height: 16px; cursor: pointer; }
+        .day-card { transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease; }
+        .day-card:hover { transform: translateY(-1px); }
+        .fab-btn { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+        .fab-btn:hover { transform: scale(1.06); }
+        .btn-primary, .btn-ghost { transition: filter 0.15s ease, transform 0.1s ease, border-color 0.15s ease; }
+        .btn-primary:hover { filter: brightness(1.08); }
+        .btn-primary:active, .btn-ghost:active { transform: scale(0.97); }
+        .btn-ghost:hover { border-color: #4a463c !important; color: #a39e94 !important; }
+        .icon-btn:hover { color: #e8e4dc !important; background: #1f1e1a; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #2a2824; border-radius: 8px; }
       `}</style>
 
       {/* Header */}
       <div style={styles.header}>
-        <h1 style={styles.title}>Spend<br />Log</h1>
-        <div style={styles.headerRight}>
+        <div>
+          <h1 style={styles.title}>Spend Log</h1>
           <p style={styles.subtitle}>
             {today.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
           </p>
-          <p style={styles.mtdHeader}>
-            MTD: <span style={{ color: mtdTotal < 0 ? "#7ec97e" : "#e8c97e" }}>
+        </div>
+        <div style={styles.statCard}>
+          <div style={styles.statMain}>
+            <span style={styles.statMainLabel}>Month to date</span>
+            <span style={{ ...styles.statMainValue, color: mtdTotal < 0 ? "#7ec97e" : "#e8c97e" }}>
               {mtdTotal < 0 ? "-" : ""}${Math.abs(mtdTotal).toFixed(2)}
             </span>
-          </p>
-          {foodMtd !== 0 && (
-            <p style={styles.categoryHeader}>
-              🍔 Food: <span style={{ color: foodMtd < 0 ? "#7ec97e" : "#e8c97e" }}>
-                {foodMtd < 0 ? "-" : ""}${Math.abs(foodMtd).toFixed(2)}
-              </span>
-            </p>
+          </div>
+          {(foodMtd !== 0 || gasMtd !== 0 || prevMonthTotal !== 0) && (
+            <div style={styles.statRow}>
+              {foodMtd !== 0 && (
+                <span style={styles.statChip}>
+                  🍔 <span style={{ color: foodMtd < 0 ? "#7ec97e" : "#c9b587" }}>
+                    {foodMtd < 0 ? "-" : ""}${Math.abs(foodMtd).toFixed(2)}
+                  </span>
+                </span>
+              )}
+              {gasMtd !== 0 && (
+                <span style={styles.statChip}>
+                  ⛽ <span style={{ color: gasMtd < 0 ? "#7ec97e" : "#c9b587" }}>
+                    {gasMtd < 0 ? "-" : ""}${Math.abs(gasMtd).toFixed(2)}
+                  </span>
+                </span>
+              )}
+              {prevMonthTotal !== 0 && (
+                <span style={styles.statChip}>
+                  {prevMonthLabel} <span style={{ color: prevMonthTotal < 0 ? "#7ec97e" : "#c9b587" }}>
+                    {prevMonthTotal < 0 ? "-" : ""}${Math.abs(prevMonthTotal).toFixed(2)}
+                  </span>
+                </span>
+              )}
+            </div>
           )}
-          {gasMtd !== 0 && (
-            <p style={styles.categoryHeader}>
-              ⛽ Gas: <span style={{ color: gasMtd < 0 ? "#7ec97e" : "#e8c97e" }}>
-                {gasMtd < 0 ? "-" : ""}${Math.abs(gasMtd).toFixed(2)}
-              </span>
-            </p>
-          )}
-          <p style={styles.categoryHeader}>
-            {prevMonthLabel}: <span style={{ color: prevMonthTotal < 0 ? "#7ec97e" : "#e8c97e" }}>
-              {prevMonthTotal < 0 ? "-" : ""}${Math.abs(prevMonthTotal).toFixed(2)}
-            </span>
-          </p>
         </div>
       </div>
 
@@ -536,8 +568,8 @@ export default function App() {
                           <span style={{ fontSize: 11, color: isCredit ? "#7ec97e" : "#6b6660" }}>Credit / Refund</span>
                         </label>
                         <div style={{ display: "flex", gap: 6 }}>
-                          <button style={{ ...styles.saveBtn, padding: "7px 12px", fontSize: 11 }} onClick={saveEdit}>Save</button>
-                          <button style={{ ...styles.cancelBtn, padding: "7px 12px", fontSize: 11 }} onClick={cancelEdit}>Cancel</button>
+                          <button className="btn-primary" style={{ ...styles.saveBtn, padding: "7px 12px", fontSize: 11 }} onClick={saveEdit}>Save</button>
+                          <button className="btn-ghost" style={{ ...styles.cancelBtn, padding: "7px 12px", fontSize: 11 }} onClick={cancelEdit}>Cancel</button>
                         </div>
                       </div>
                     ) : (
@@ -555,8 +587,8 @@ export default function App() {
                           {entry.desc && <span style={styles.entryDesc}>{entry.desc}</span>}
                         </div>
                         <div className="entry-actions" style={{ ...styles.entryActions, opacity: 0 }}>
-                          <button style={styles.iconBtn} onClick={() => startEdit(entry)}>✎</button>
-                          <button style={{ ...styles.iconBtn, color: "#c0614a" }} onClick={() => deleteEntry(entry.id)}>✕</button>
+                          <button className="icon-btn" style={styles.iconBtn} onClick={() => startEdit(entry)}>✎</button>
+                          <button className="icon-btn" style={{ ...styles.iconBtn, color: "#c0614a" }} onClick={() => deleteEntry(entry.id)}>✕</button>
                         </div>
                       </>
                     )}
@@ -602,8 +634,8 @@ export default function App() {
                   <span style={{ fontSize: 11, color: isCredit ? "#7ec97e" : "#6b6660" }}>Credit / Refund</span>
                 </label>
                 <div style={styles.modalActions}>
-                  <button style={styles.cancelBtn} onClick={closeModal}>Done</button>
-                  <button style={{ ...styles.saveBtn, background: isCredit ? "#7ec97e" : "#e8c97e" }} onClick={addEntry}>
+                  <button className="btn-ghost" style={styles.cancelBtn} onClick={closeModal}>Done</button>
+                  <button className="btn-primary" style={{ ...styles.saveBtn, background: isCredit ? "#7ec97e" : "#e8c97e" }} onClick={addEntry}>
                     {isCredit ? "Add Credit" : "Add Entry"}
                   </button>
                 </div>
@@ -667,41 +699,50 @@ const cs = {
 
 const styles = {
   root: {
-    fontFamily: "'DM Mono', monospace", background: "#0f0e0c",
+    fontFamily: "'DM Mono', monospace", background: "transparent",
     minHeight: "100vh", color: "#e8e4dc", maxWidth: 480,
     margin: "0 auto", padding: "0 0 80px",
   },
   header: {
-    padding: "32px 24px 20px", borderBottom: "1px solid #2a2824",
-    display: "flex", justifyContent: "space-between", alignItems: "flex-end",
+    padding: "30px 20px 22px", borderBottom: "1px solid #211f1b",
+    display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 12,
   },
-  headerRight: { textAlign: "right" },
   title: {
-    fontFamily: "'DM Serif Display', serif", fontSize: 48,
-    lineHeight: 1.05, color: "#e8c97e", letterSpacing: "-1px",
+    fontFamily: "'DM Serif Display', serif", fontSize: 34,
+    lineHeight: 1.1, color: "#e8c97e", letterSpacing: "-0.5px",
   },
-  subtitle: { fontSize: 11, color: "#6b6660", letterSpacing: "0.12em", textTransform: "uppercase" },
-  mtdHeader: { fontSize: 11, color: "#6b6660", marginTop: 4, letterSpacing: "0.06em" },
-  categoryHeader: { fontSize: 11, color: "#6b6660", marginTop: 2, letterSpacing: "0.06em" },
+  subtitle: { fontSize: 11, color: "#6b6660", letterSpacing: "0.12em", textTransform: "uppercase", marginTop: 6 },
+  statCard: {
+    background: "#15140f", border: "1px solid #211f1b", borderRadius: 12,
+    padding: "10px 16px", textAlign: "right", boxShadow: "0 2px 10px rgba(0,0,0,0.25)",
+  },
+  statMain: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 },
+  statMainLabel: { fontSize: 9, color: "#6b6660", letterSpacing: "0.1em", textTransform: "uppercase" },
+  statMainValue: { fontFamily: "'DM Serif Display', serif", fontSize: 24 },
+  statRow: {
+    display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8,
+    paddingTop: 8, borderTop: "1px solid #211f1b", flexWrap: "wrap",
+  },
+  statChip: { fontSize: 10, color: "#6b6660", letterSpacing: "0.03em", whiteSpace: "nowrap" },
   weeksContainer: { padding: "0 8px" },
-  weekSection: { marginTop: 20 },
+  weekSection: { marginTop: 22 },
   weekHeader: {
     display: "flex", flexDirection: "column", gap: 2,
-    marginBottom: 10, paddingBottom: 8, borderBottom: "1px solid #2a2824",
+    marginBottom: 12, paddingBottom: 9, borderBottom: "1px solid #211f1b",
   },
   weekLabel: { fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: "#8b8680" },
   weekRange: { fontSize: 10, color: "#5a5650" },
   weekTotal: { fontFamily: "'DM Serif Display', serif", fontSize: 20, marginTop: 2 },
-  dayGrid: { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 },
+  weekTotalEmpty: { fontSize: 11, color: "#3a3830", marginTop: 6, letterSpacing: "0.04em" },
+  dayGrid: { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 5 },
   dayCard: {
-    background: "#1a1916", border: "1px solid #2a2824", borderRadius: 6,
-    padding: "6px 5px", transition: "border-color 0.15s, background 0.15s",
-    minHeight: 64, display: "flex", flexDirection: "column", gap: 3,
+    background: "#15140f", border: "1px solid #211f1b", borderRadius: 10,
+    padding: "8px 5px", minHeight: 70, display: "flex", flexDirection: "column", gap: 3,
   },
-  todayCard: { borderColor: "#e8c97e44", background: "#1e1d18" },
+  todayCard: { borderColor: "#e8c97e55", background: "#1c1a14", boxShadow: "0 0 0 1px #e8c97e22" },
   futureCard: { opacity: 0.3 },
-  hasEntry: { borderColor: "#e8c97e66", background: "#1d1c17" },
-  creditEntry: { borderColor: "#7ec97e66", background: "#141a14" },
+  hasEntry: { borderColor: "#e8c97e55", background: "#1a1813" },
+  creditEntry: { borderColor: "#7ec97e55", background: "#131a13" },
   animCard: { animation: "pulse 0.6s ease" },
   dayRow: { display: "flex", flexDirection: "column", alignItems: "center", gap: 1 },
   dayName: { fontSize: 8, letterSpacing: "0.06em", color: "#6b6660", textTransform: "uppercase" },
@@ -711,18 +752,19 @@ const styles = {
   entryBlock: { display: "flex", flexDirection: "column", alignItems: "center", gap: 1 },
   amount: { fontSize: 10, lineHeight: 1.2, textAlign: "center" },
   entryCount: { fontSize: 8, color: "#6b6660" },
-  addHint: { fontSize: 9, color: "#3a3830" },
-  mtdBlock: { display: "flex", flexDirection: "column", alignItems: "center", gap: 1, marginTop: 2 },
-  mtdValue: { fontSize: 8, lineHeight: 1.2 },
-  mtdLabel: { fontSize: 7, color: "#a8894e", letterSpacing: "0.1em", textTransform: "uppercase" },
+  addHint: { fontSize: 9, color: "#4a453c" },
+  mtdBlock: { display: "flex", flexDirection: "column", alignItems: "center", gap: 1, marginTop: 3, paddingTop: 3, borderTop: "1px solid #211f1b" },
+  mtdValue: { fontSize: 8, lineHeight: 1.2, opacity: 0.75 },
+  mtdLabel: { fontSize: 7, color: "#6b5a38", letterSpacing: "0.1em", textTransform: "uppercase" },
   overlay: {
     position: "fixed", inset: 0, background: "rgba(0,0,0,0.78)",
     display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 100, padding: 16,
   },
   modalBox: {
-    background: "#1a1916", border: "1px solid #2a2824", borderRadius: 16,
+    background: "#17160f", border: "1px solid #2a2824", borderRadius: 18,
     padding: 24, width: "100%", maxWidth: 440, display: "flex",
     flexDirection: "column", gap: 16, maxHeight: "85vh", overflowY: "auto",
+    boxShadow: "0 -8px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.02) inset",
   },
   modalHeader: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" },
   modalDay: { fontFamily: "'DM Serif Display', serif", fontSize: 22, color: "#e8c97e" },
@@ -737,24 +779,24 @@ const styles = {
   },
   entryRow: {
     display: "flex", alignItems: "center", justifyContent: "space-between",
-    padding: "8px 10px", borderRadius: 6, background: "#111009",
-    border: "1px solid #222120", transition: "border-color 0.1s", gap: 8,
+    padding: "9px 11px", borderRadius: 9, background: "#111009",
+    border: "1px solid #222120", transition: "border-color 0.1s, background 0.1s", gap: 8,
   },
   entryInfo: { display: "flex", flexDirection: "column", gap: 3, flex: 1, minWidth: 0 },
   entryAmount: { fontFamily: "'DM Serif Display', serif", fontSize: 15 },
   entryDesc: { fontSize: 10, color: "#6b6660", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", letterSpacing: "0.04em" },
   entryActions: { display: "flex", gap: 4, transition: "opacity 0.15s", flexShrink: 0 },
-  iconBtn: { background: "transparent", border: "none", color: "#6b6660", cursor: "pointer", fontSize: 14, padding: "2px 5px", borderRadius: 4, fontFamily: "inherit" },
+  iconBtn: { background: "transparent", border: "none", color: "#6b6660", cursor: "pointer", fontSize: 14, padding: "4px 7px", borderRadius: 6, fontFamily: "inherit", transition: "color 0.15s, background 0.15s" },
   inlineEdit: { display: "flex", flexDirection: "column", gap: 8, width: "100%" },
   addSection: { display: "flex", flexDirection: "column", gap: 10 },
   addSectionLabel: { fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: "#6b6660" },
   input: {
-    background: "#111009", border: "1px solid #2a2824", borderRadius: 8,
+    background: "#111009", border: "1px solid #2a2824", borderRadius: 9,
     padding: "12px 14px", color: "#e8e4dc", fontFamily: "'DM Mono', monospace",
     fontSize: 15, width: "100%", transition: "border-color 0.15s",
   },
   select: {
-    background: "#111009", border: "1px solid #2a2824", borderRadius: 8,
+    background: "#111009", border: "1px solid #2a2824", borderRadius: 9,
     padding: "12px 14px", color: "#e8e4dc", fontFamily: "'DM Mono', monospace",
     fontSize: 13, width: "100%", cursor: "pointer", transition: "border-color 0.15s",
     appearance: "none",
@@ -765,17 +807,18 @@ const styles = {
   },
   modalActions: { display: "flex", gap: 8 },
   saveBtn: {
-    flex: 1, border: "none", borderRadius: 8, padding: "12px",
+    flex: 1, border: "none", borderRadius: 9, padding: "12px",
     fontFamily: "'DM Mono', monospace", fontSize: 13, fontWeight: 500,
     cursor: "pointer", letterSpacing: "0.06em", color: "#0f0e0c",
+    boxShadow: "0 2px 12px rgba(232,201,126,0.18)",
   },
   cancelBtn: {
     flex: 1, background: "transparent", color: "#6b6660", border: "1px solid #2a2824",
-    borderRadius: 8, padding: "12px", fontFamily: "'DM Mono', monospace",
+    borderRadius: 9, padding: "12px", fontFamily: "'DM Mono', monospace",
     fontSize: 13, cursor: "pointer", letterSpacing: "0.06em",
   },
   categoryBadge: (cat) => ({
-    fontSize: 9, padding: "2px 6px", borderRadius: 4,
+    fontSize: 9, padding: "2px 6px", borderRadius: 5,
     background: categoryColors[cat]?.bg || categoryColors.Misc.bg,
     color: categoryColors[cat]?.color || categoryColors.Misc.color,
     border: `1px solid ${categoryColors[cat]?.border || categoryColors.Misc.border}`,
