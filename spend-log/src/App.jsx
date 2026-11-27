@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-const CATEGORIES = ["", "Food", "Misc", "Entertainment"];
+const CATEGORIES = ["", "Food", "Gas", "Misc", "Entertainment"];
 
 function getWeekStart(date) {
   const d = new Date(date);
@@ -36,6 +36,17 @@ function getMtdTotal(ledger, upToDate) {
   Object.entries(ledger).forEach(([key, entries]) => {
     const d = new Date(key + "T00:00:00");
     if (d.getFullYear() === year && d.getMonth() === month && d <= upToDate) {
+      total += dayTotal(entries);
+    }
+  });
+  return total;
+}
+
+function getMonthTotal(ledger, year, month) {
+  let total = 0;
+  Object.entries(ledger).forEach(([key, entries]) => {
+    const d = new Date(key + "T00:00:00");
+    if (d.getFullYear() === year && d.getMonth() === month) {
       total += dayTotal(entries);
     }
   });
@@ -105,7 +116,7 @@ Only answer questions about their spending data. If asked anything unrelated, po
 Keep answers short — 1 to 3 sentences max unless a breakdown is needed.
 Always use dollar signs and format numbers to 2 decimal places.
 Negative amounts represent credits or refunds.
-Entries have categories: Misc, Food, Entertainment.
+Entries have categories: Misc, Food, Gas, Entertainment.
 
 SPENDING DATA:
 ${context}`;
@@ -310,6 +321,10 @@ export default function App() {
 
   const mtdTotal = getMtdTotal(ledger, today);
   const foodMtd = getMtdByCategory(ledger, today, "Food");
+  const gasMtd = getMtdByCategory(ledger, today, "Gas");
+  const prevMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  const prevMonthTotal = getMonthTotal(ledger, prevMonthDate.getFullYear(), prevMonthDate.getMonth());
+  const prevMonthLabel = prevMonthDate.toLocaleDateString("en-US", { month: "long" });
   const modalEntries = modal ? (ledger[modal.key] || []) : [];
   const modalTotal = dayTotal(modalEntries);
 
@@ -343,14 +358,14 @@ export default function App() {
             return (
               <div
                 key={key}
-                onClick={() => !isFuture && !isOtherMonth && openModal(date)}
+                onClick={() => !isOtherMonth && openModal(date)}
                 style={{
                   ...styles.dayCard,
                   ...(isToday ? styles.todayCard : {}),
-                  ...(isFuture || isOtherMonth ? styles.futureCard : {}),
+                  ...(isOtherMonth ? styles.futureCard : {}),
                   ...(entries.length > 0 && !isOtherMonth ? (isCredit ? styles.creditEntry : styles.hasEntry) : {}),
                   ...(isAnim ? styles.animCard : {}),
-                  cursor: isFuture || isOtherMonth ? "default" : "pointer",
+                  cursor: isOtherMonth ? "default" : "pointer",
                 }}
               >
                 <div style={styles.dayRow}>
@@ -372,7 +387,7 @@ export default function App() {
                         </span>
                       </>
                     ) : (
-                      !isFuture && !isOtherMonth && <span style={styles.addHint}>+ add</span>
+                      !isOtherMonth && <span style={styles.addHint}>+ add</span>
                     )}
                   </div>
 
@@ -432,6 +447,18 @@ export default function App() {
               </span>
             </p>
           )}
+          {gasMtd !== 0 && (
+            <p style={styles.categoryHeader}>
+              ⛽ Gas: <span style={{ color: gasMtd < 0 ? "#7ec97e" : "#e8c97e" }}>
+                {gasMtd < 0 ? "-" : ""}${Math.abs(gasMtd).toFixed(2)}
+              </span>
+            </p>
+          )}
+          <p style={styles.categoryHeader}>
+            {prevMonthLabel}: <span style={{ color: prevMonthTotal < 0 ? "#7ec97e" : "#e8c97e" }}>
+              {prevMonthTotal < 0 ? "-" : ""}${Math.abs(prevMonthTotal).toFixed(2)}
+            </span>
+          </p>
         </div>
       </div>
 
@@ -593,6 +620,7 @@ export default function App() {
 
 const categoryColors = {
   Food: { bg: "#1a2a1a", color: "#7ec97e", border: "#2a4a2a" },
+  Gas: { bg: "#2a2416", color: "#c99e5e", border: "#4a3a1e" },
   Entertainment: { bg: "#1a1a2a", color: "#7e9ec9", border: "#2a2a4a" },
   Misc: { bg: "#2a2824", color: "#8b8680", border: "#3a3830" },
 };
