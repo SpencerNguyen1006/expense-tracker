@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-const CATEGORIES = ["", "Food", "Misc", "Entertainment"];
+const CATEGORIES = ["", "Food", "Gas", "Misc", "Entertainment"];
 
 function getWeekStart(date) {
   const d = new Date(date);
@@ -116,7 +116,7 @@ Only answer questions about their spending data. If asked anything unrelated, po
 Keep answers short — 1 to 3 sentences max unless a breakdown is needed.
 Always use dollar signs and format numbers to 2 decimal places.
 Negative amounts represent credits or refunds.
-Entries have categories: Misc, Food, Entertainment.
+Entries have categories: Misc, Food, Gas, Entertainment.
 
 SPENDING DATA:
 ${context}`;
@@ -321,6 +321,7 @@ export default function App() {
 
   const mtdTotal = getMtdTotal(ledger, today);
   const foodMtd = getMtdByCategory(ledger, today, "Food");
+  const gasMtd = getMtdByCategory(ledger, today, "Gas");
   const prevMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
   const prevMonthTotal = getMonthTotal(ledger, prevMonthDate.getFullYear(), prevMonthDate.getMonth());
   const prevMonthLabel = prevMonthDate.toLocaleDateString("en-US", { month: "long" });
@@ -443,6 +444,13 @@ export default function App() {
             <p style={styles.categoryHeader}>
               🍔 Food: <span style={{ color: foodMtd < 0 ? "#7ec97e" : "#e8c97e" }}>
                 {foodMtd < 0 ? "-" : ""}${Math.abs(foodMtd).toFixed(2)}
+              </span>
+            </p>
+          )}
+          {gasMtd !== 0 && (
+            <p style={styles.categoryHeader}>
+              ⛽ Gas: <span style={{ color: gasMtd < 0 ? "#7ec97e" : "#e8c97e" }}>
+                {gasMtd < 0 ? "-" : ""}${Math.abs(gasMtd).toFixed(2)}
               </span>
             </p>
           )}
@@ -612,6 +620,7 @@ export default function App() {
 
 const categoryColors = {
   Food: { bg: "#1a2a1a", color: "#7ec97e", border: "#2a4a2a" },
+  Gas: { bg: "#2a2416", color: "#c99e5e", border: "#4a3a1e" },
   Entertainment: { bg: "#1a1a2a", color: "#7e9ec9", border: "#2a2a4a" },
   Misc: { bg: "#2a2824", color: "#8b8680", border: "#3a3830" },
 };
