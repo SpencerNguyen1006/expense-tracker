@@ -42,6 +42,17 @@ function getMtdTotal(ledger, upToDate) {
   return total;
 }
 
+function getMonthTotal(ledger, year, month) {
+  let total = 0;
+  Object.entries(ledger).forEach(([key, entries]) => {
+    const d = new Date(key + "T00:00:00");
+    if (d.getFullYear() === year && d.getMonth() === month) {
+      total += dayTotal(entries);
+    }
+  });
+  return total;
+}
+
 function getMtdByCategory(ledger, upToDate, category) {
   const year = upToDate.getFullYear();
   const month = upToDate.getMonth();
@@ -310,6 +321,9 @@ export default function App() {
 
   const mtdTotal = getMtdTotal(ledger, today);
   const foodMtd = getMtdByCategory(ledger, today, "Food");
+  const prevMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  const prevMonthTotal = getMonthTotal(ledger, prevMonthDate.getFullYear(), prevMonthDate.getMonth());
+  const prevMonthLabel = prevMonthDate.toLocaleDateString("en-US", { month: "long" });
   const modalEntries = modal ? (ledger[modal.key] || []) : [];
   const modalTotal = dayTotal(modalEntries);
 
@@ -343,14 +357,14 @@ export default function App() {
             return (
               <div
                 key={key}
-                onClick={() => !isFuture && !isOtherMonth && openModal(date)}
+                onClick={() => !isOtherMonth && openModal(date)}
                 style={{
                   ...styles.dayCard,
                   ...(isToday ? styles.todayCard : {}),
-                  ...(isFuture || isOtherMonth ? styles.futureCard : {}),
+                  ...(isOtherMonth ? styles.futureCard : {}),
                   ...(entries.length > 0 && !isOtherMonth ? (isCredit ? styles.creditEntry : styles.hasEntry) : {}),
                   ...(isAnim ? styles.animCard : {}),
-                  cursor: isFuture || isOtherMonth ? "default" : "pointer",
+                  cursor: isOtherMonth ? "default" : "pointer",
                 }}
               >
                 <div style={styles.dayRow}>
@@ -372,7 +386,7 @@ export default function App() {
                         </span>
                       </>
                     ) : (
-                      !isFuture && !isOtherMonth && <span style={styles.addHint}>+ add</span>
+                      !isOtherMonth && <span style={styles.addHint}>+ add</span>
                     )}
                   </div>
 
@@ -432,6 +446,11 @@ export default function App() {
               </span>
             </p>
           )}
+          <p style={styles.categoryHeader}>
+            {prevMonthLabel}: <span style={{ color: prevMonthTotal < 0 ? "#7ec97e" : "#e8c97e" }}>
+              {prevMonthTotal < 0 ? "-" : ""}${Math.abs(prevMonthTotal).toFixed(2)}
+            </span>
+          </p>
         </div>
       </div>
 
